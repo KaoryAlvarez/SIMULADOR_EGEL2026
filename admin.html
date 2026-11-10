@@ -1,0 +1,1139 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Panel Administrativo Privado · Simulador EGEL 2026</title>
+    <style>
+        :root {
+            --bg-dark: #0f172a;
+            --bg-card: #1e293b;
+            --bg-card-hover: #263349;
+            --border-color: #334155;
+            --text-primary: #f8fafc;
+            --text-secondary: #94a3b8;
+            --accent-green: #10b981;
+            --accent-green-bg: rgba(16, 185, 129, 0.14);
+            --accent-amber: #f59e0b;
+            --accent-amber-bg: rgba(245, 158, 11, 0.14);
+            --accent-red: #ef4444;
+            --accent-red-bg: rgba(239, 68, 68, 0.15);
+            --accent-blue: #3b82f6;
+            --accent-blue-bg: rgba(59, 130, 246, 0.15);
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            background: var(--bg-dark);
+            color: var(--text-primary);
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Inter, Arial, sans-serif;
+            min-height: 100vh;
+            line-height: 1.5;
+        }
+
+        .hidden {
+            display: none !important;
+        }
+
+        /* PANTALLA DE LOGIN DEL CREADOR */
+        .admin-login-wrapper {
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+            background: radial-gradient(circle at top, #1e293b 0%, #0f172a 100%);
+        }
+
+        .admin-login-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-top: 4px solid var(--accent-green);
+            border-radius: 14px;
+            width: 100%;
+            max-width: 420px;
+            padding: 38px 32px;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.6);
+            text-align: center;
+        }
+
+        .admin-badge {
+            display: inline-block;
+            background: var(--accent-green-bg);
+            color: var(--accent-green);
+            font-size: 11px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.8px;
+            padding: 4px 12px;
+            border-radius: 999px;
+            margin-bottom: 12px;
+            border: 1px solid rgba(16, 185, 129, 0.3);
+        }
+
+        .admin-login-card h1 {
+            font-size: 21px;
+            margin-bottom: 8px;
+        }
+
+        .admin-login-card p {
+            font-size: 13.5px;
+            color: var(--text-secondary);
+            margin-bottom: 24px;
+        }
+
+        .input-group {
+            text-align: left;
+            margin-bottom: 16px;
+        }
+
+        .input-group label {
+            display: block;
+            font-size: 12px;
+            font-weight: 600;
+            color: #cbd5e1;
+            margin-bottom: 6px;
+        }
+
+        .input-control {
+            width: 100%;
+            background: #0f172a;
+            border: 1px solid var(--border-color);
+            color: var(--text-primary);
+            padding: 12px 14px;
+            border-radius: 8px;
+            font-size: 14px;
+            outline: none;
+            transition: border-color 0.2s;
+        }
+
+        .input-control:focus {
+            border-color: var(--accent-green);
+        }
+
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+            padding: 10px 16px;
+            border-radius: 8px;
+            font-size: 13px;
+            font-weight: 600;
+            border: 1px solid transparent;
+            cursor: pointer;
+            transition: all 0.18s;
+            text-decoration: none;
+        }
+
+        .btn-primary {
+            background: var(--accent-green);
+            color: #052e16;
+            width: 100%;
+            padding: 13px;
+            font-size: 14px;
+            font-weight: 700;
+        }
+
+        .btn-primary:hover {
+            filter: brightness(108%);
+        }
+
+        .btn-danger {
+            background: var(--accent-red);
+            color: #fff;
+        }
+
+        .btn-danger:hover {
+            background: #dc2626;
+        }
+
+        .btn-outline-danger {
+            background: var(--accent-red-bg);
+            color: #fca5a5;
+            border-color: rgba(239, 68, 68, 0.35);
+            padding: 5px 10px;
+            font-size: 11.5px;
+        }
+
+        .btn-outline-danger:hover {
+            background: var(--accent-red);
+            color: #fff;
+        }
+
+        .btn-secondary {
+            background: #334155;
+            color: #e2e8f0;
+            border-color: #475569;
+        }
+
+        .btn-secondary:hover {
+            background: #475569;
+        }
+
+        .btn-sm {
+            padding: 5px 10px;
+            font-size: 11.5px;
+            border-radius: 6px;
+        }
+
+        .login-error {
+            background: var(--accent-red-bg);
+            border: 1px solid rgba(239, 68, 68, 0.4);
+            color: #fca5a5;
+            padding: 10px 12px;
+            border-radius: 8px;
+            font-size: 12.5px;
+            margin-bottom: 16px;
+        }
+
+        /* LAYOUT DEL DASHBOARD */
+        .dashboard-header {
+            background: rgba(30, 41, 59, 0.9);
+            backdrop-filter: blur(8px);
+            border-bottom: 1px solid var(--border-color);
+            padding: 16px 28px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            flex-wrap: wrap;
+            gap: 14px;
+            position: sticky;
+            top: 0;
+            z-index: 20;
+        }
+
+        .brand-title {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .live-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: var(--accent-green);
+            box-shadow: 0 0 0 4px rgba(16, 185, 129, 0.25);
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.45; }
+        }
+
+        .brand-title h2 {
+            font-size: 18px;
+            font-weight: 700;
+        }
+
+        .brand-subtitle {
+            font-size: 12px;
+            color: var(--text-secondary);
+        }
+
+        .header-actions {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        .dashboard-container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 24px 28px 60px;
+        }
+
+        /* TARJETAS KPI */
+        .kpi-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+            gap: 16px;
+            margin-bottom: 24px;
+        }
+
+        .kpi-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 18px 20px;
+        }
+
+        .kpi-label {
+            font-size: 12px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            color: var(--text-secondary);
+            margin-bottom: 6px;
+        }
+
+        .kpi-value {
+            font-size: 28px;
+            font-weight: 800;
+        }
+
+        .kpi-sub {
+            font-size: 12px;
+            color: var(--text-secondary);
+            margin-top: 4px;
+        }
+
+        /* SECCIONES Y TABLAS */
+        .panel-section {
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            margin-bottom: 24px;
+            overflow: hidden;
+        }
+
+        .panel-header {
+            padding: 16px 20px;
+            border-bottom: 1px solid var(--border-color);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            flex-wrap: wrap;
+            gap: 12px;
+        }
+
+        .panel-header h3 {
+            font-size: 15.5px;
+            font-weight: 700;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .filter-bar {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        .search-input {
+            background: #0f172a;
+            border: 1px solid var(--border-color);
+            color: var(--text-primary);
+            padding: 7px 12px;
+            border-radius: 6px;
+            font-size: 13px;
+            min-width: 240px;
+        }
+
+        .table-responsive {
+            width: 100%;
+            overflow-x: auto;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            text-align: left;
+            font-size: 13px;
+        }
+
+        th {
+            background: rgba(15, 23, 42, 0.6);
+            color: var(--text-secondary);
+            font-weight: 600;
+            text-transform: uppercase;
+            font-size: 11px;
+            letter-spacing: 0.5px;
+            padding: 12px 16px;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        td {
+            padding: 14px 16px;
+            border-bottom: 1px solid rgba(51, 65, 85, 0.5);
+            vertical-align: middle;
+        }
+
+        tr:hover td {
+            background: rgba(255, 255, 255, 0.02);
+        }
+
+        .status-pill {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 4px 10px;
+            border-radius: 999px;
+            font-size: 11.5px;
+            font-weight: 700;
+        }
+
+        .status-activa {
+            background: var(--accent-green-bg);
+            color: #34d399;
+            border: 1px solid rgba(16, 185, 129, 0.35);
+        }
+
+        .status-inactiva {
+            background: var(--accent-amber-bg);
+            color: #fbbf24;
+            border: 1px solid rgba(245, 158, 11, 0.35);
+        }
+
+        .status-bloqueada {
+            background: var(--accent-red-bg);
+            color: #f87171;
+            border: 1px solid rgba(239, 68, 68, 0.4);
+        }
+
+        .mono-tag {
+            font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+            font-size: 11.5px;
+            background: rgba(15, 23, 42, 0.8);
+            border: 1px solid var(--border-color);
+            padding: 2px 6px;
+            border-radius: 4px;
+            color: #cbd5e1;
+            display: inline-block;
+            margin-top: 2px;
+        }
+
+        .action-btns {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+        }
+
+        .grid-2col {
+            display: grid;
+            grid-template-columns: 1fr 1.4fr;
+            gap: 24px;
+        }
+
+        @media (max-width: 980px) {
+            .grid-2col {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .panel-body {
+            padding: 20px;
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 36px 20px;
+            color: var(--text-secondary);
+            font-size: 13.5px;
+        }
+
+        .toast-banner {
+            position: fixed;
+            bottom: 24px;
+            right: 24px;
+            background: #065f46;
+            border: 1px solid #10b981;
+            color: #ecfdf5;
+            padding: 12px 18px;
+            border-radius: 10px;
+            font-size: 13px;
+            font-weight: 600;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5);
+            z-index: 100;
+            transition: opacity 0.25s;
+        }
+    </style>
+    <script src="egel-security.js"></script>
+</head>
+<body>
+
+    <!-- 1. PANTALLA DE AUTENTICACIÓN EXCLUSIVA DEL CREADOR -->
+    <div id="admin-login-screen" class="admin-login-wrapper">
+        <div class="admin-login-card">
+            <span class="admin-badge">Exclusivo Creador</span>
+            <h1>Panel de Control y Seguridad</h1>
+            <p>Monitoreo de sesiones en tiempo real y revocación inmediata de accesos del Simulador EGEL 2026.</p>
+
+            <div id="admin-login-error" class="login-error hidden">
+                Contraseña administrativa incorrecta. Acceso denegado.
+            </div>
+
+            <form id="admin-login-form">
+                <div class="input-group">
+                    <label for="admin-password-input">Contraseña del Creador</label>
+                    <input
+                        id="admin-password-input"
+                        type="password"
+                        class="input-control"
+                        placeholder="Ingresa tu clave privada..."
+                        required
+                        autofocus
+                    />
+                </div>
+                <button type="submit" class="btn btn-primary">INGRESAR AL PANEL</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- 2. DASHBOARD ADMINISTRATIVO EN TIEMPO REAL -->
+    <div id="admin-dashboard-screen" class="hidden">
+        <header class="dashboard-header">
+            <div class="brand-title">
+                <span class="live-dot" title="Monitoreo en Tiempo Real Activo"></span>
+                <div>
+                    <h2>Panel Administrativo · Simulador EGEL 2026</h2>
+                    <div class="brand-subtitle">
+                        Sincronización Zero-DB activa (LocalStorage + BroadcastChannel + Relay en Tiempo Real)
+                    </div>
+                </div>
+            </div>
+            <div class="header-actions">
+                <button type="button" id="btn-ping-sessions" class="btn btn-secondary btn-sm">
+                    &#x21bb; Actualizar / Sondear Activos
+                </button>
+                <button type="button" id="btn-export-blocklist" class="btn btn-secondary btn-sm">
+                    &#x2B73; Exportar blocklist.json
+                </button>
+                <label class="btn btn-secondary btn-sm" style="cursor:pointer;">
+                    &#x2B71; Importar blocklist.json
+                    <input type="file" id="input-import-blocklist" accept=".json" class="hidden" />
+                </label>
+                <button type="button" id="btn-clear-inactive" class="btn btn-secondary btn-sm">
+                    Limpiar Inactivas
+                </button>
+                <button type="button" id="btn-admin-logout" class="btn btn-outline-danger btn-sm">
+                    Cerrar Sesión Admin
+                </button>
+            </div>
+        </header>
+
+        <main class="dashboard-container">
+            <!-- TARJETAS KPI -->
+            <div class="kpi-grid">
+                <div class="kpi-card">
+                    <div class="kpi-label">Sesiones Activas</div>
+                    <div id="kpi-active" class="kpi-value" style="color: var(--accent-green);">0</div>
+                    <div class="kpi-sub">Conectadas en este momento</div>
+                </div>
+                <div class="kpi-card">
+                    <div class="kpi-label">Sesiones Inactivas / Ausentes</div>
+                    <div id="kpi-inactive" class="kpi-value" style="color: var(--accent-amber);">0</div>
+                    <div class="kpi-sub">Sin actividad reciente o cerradas</div>
+                </div>
+                <div class="kpi-card">
+                    <div class="kpi-label">Total Sesiones Detectadas</div>
+                    <div id="kpi-total" class="kpi-value" style="color: var(--accent-blue);">0</div>
+                    <div class="kpi-sub">Historial en memoria local/remota</div>
+                </div>
+                <div class="kpi-card">
+                    <div class="kpi-label">Reglas de Bloqueo Activas</div>
+                    <div id="kpi-blocked" class="kpi-value" style="color: var(--accent-red);">0</div>
+                    <div class="kpi-sub">Nombres, correos y dispositivos revocados</div>
+                </div>
+            </div>
+
+            <!-- TABLA DE SESIONES EN TIEMPO REAL -->
+            <section class="panel-section">
+                <div class="panel-header">
+                    <h3>&#128101; Sesiones Detectadas en Tiempo Real</h3>
+                    <div class="filter-bar">
+                        <input
+                            type="text"
+                            id="session-search-input"
+                            class="search-input"
+                            placeholder="Filtrar por nombre, correo, dispositivo o IP..."
+                        />
+                    </div>
+                </div>
+                <div class="table-responsive">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Primer Nombre</th>
+                                <th>Correo Electrónico / ID</th>
+                                <th>Dispositivo / IP / Token</th>
+                                <th>Hora de Ingreso y Actividad</th>
+                                <th>Estado de Sesión</th>
+                                <th>Bloquear / Revocar Acceso Inmediato</th>
+                            </tr>
+                        </thead>
+                        <tbody id="sessions-table-body">
+                            <tr>
+                                <td colspan="6" class="empty-state">Cargando sesiones...</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+
+            <!-- SECCIÓN DE BLOQUEO MANUAL Y LISTA DE BLOQUEOS ACTIVOS -->
+            <div class="grid-2col">
+                <!-- FORMULARIO DE BLOQUEO DIRECTO -->
+                <section class="panel-section">
+                    <div class="panel-header">
+                        <h3>&#128683; Bloquear / Revocar Acceso Manualmente</h3>
+                    </div>
+                    <div class="panel-body">
+                        <p style="font-size: 12.5px; color: var(--text-secondary); margin-bottom: 16px;">
+                            Puedes bloquear preventivamente o revocar en caliente cualquier combinación de
+                            <strong>Primer Nombre</strong>, <strong>Correo electrónico</strong> o
+                            <strong>Dispositivo / Token de sesión / IP</strong>.
+                        </p>
+                        <form id="manual-block-form">
+                            <div class="input-group">
+                                <label for="block-name-input">Primer Nombre / Usuario (opcional)</label>
+                                <input
+                                    id="block-name-input"
+                                    type="text"
+                                    class="input-control"
+                                    placeholder="Ej. Carlos"
+                                />
+                            </div>
+                            <div class="input-group">
+                                <label for="block-email-input">Correo Electrónico (opcional)</label>
+                                <input
+                                    id="block-email-input"
+                                    type="text"
+                                    class="input-control"
+                                    placeholder="Ej. usuario@correo.com"
+                                />
+                            </div>
+                            <div class="input-group">
+                                <label for="block-device-input">ID de Dispositivo / Token de Sesión / IP (opcional)</label>
+                                <input
+                                    id="block-device-input"
+                                    type="text"
+                                    class="input-control"
+                                    placeholder="Ej. DEV-8A4F-12B9 o TOK-..."
+                                />
+                            </div>
+                            <div class="input-group">
+                                <label for="block-reason-input">Motivo del bloqueo</label>
+                                <input
+                                    id="block-reason-input"
+                                    type="text"
+                                    class="input-control"
+                                    placeholder="Ej. Compartió contraseña / Uso no autorizado"
+                                />
+                            </div>
+                            <button type="submit" class="btn btn-danger" style="width: 100%; padding: 12px;">
+                                &#128683; EJECUTAR BLOQUEO Y CERRAR SESIÓN
+                            </button>
+                        </form>
+                    </div>
+                </section>
+
+                <!-- LISTA DE BLOQUEOS ACTIVOS (CON OPCIÓN DE DESBLOQUEAR) -->
+                <section class="panel-section">
+                    <div class="panel-header">
+                        <h3>&#128274; Lista Activa de Bloqueos (Blocklist)</h3>
+                    </div>
+                    <div class="table-responsive">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Criterios Bloqueados</th>
+                                    <th>Motivo / Fecha</th>
+                                    <th>Acción</th>
+                                </tr>
+                            </thead>
+                            <tbody id="blocklist-table-body">
+                                <tr>
+                                    <td colspan="3" class="empty-state">No hay bloqueos activos.</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </section>
+            </div>
+
+            <!-- BITÁCORA DE AUDITORÍA EN TIEMPO REAL -->
+            <section class="panel-section">
+                <div class="panel-header">
+                    <h3>&#128220; Registro de Eventos y Accesos en Tiempo Real</h3>
+                </div>
+                <div class="table-responsive">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Hora</th>
+                                <th>Evento</th>
+                                <th>Primer Nombre</th>
+                                <th>Correo Electrónico</th>
+                                <th>Dispositivo / IP</th>
+                                <th>Detalle</th>
+                            </tr>
+                        </thead>
+                        <tbody id="audit-table-body">
+                            <tr>
+                                <td colspan="6" class="empty-state">Sin eventos registrados.</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <div id="toast-notification" class="toast-banner hidden"></div>
+
+    <script>
+        (function () {
+            "use strict";
+
+            const ADMIN_AUTH_SESSION_KEY = "__egel2026_admin_authenticated_v1";
+            let refreshTimer = null;
+
+            function escapeHtml(str) {
+                return String(str || "")
+                    .replace(/&/g, "&amp;")
+                    .replace(/</g, "&lt;")
+                    .replace(/>/g, "&gt;")
+                    .replace(/"/g, "&quot;")
+                    .replace(/'/g, "&#039;");
+            }
+
+            function formatDateTime(iso) {
+                if (!iso) return "-";
+                try {
+                    const d = new Date(iso);
+                    return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" }) +
+                        " (" + d.toLocaleDateString() + ")";
+                } catch (e) {
+                    return iso;
+                }
+            }
+
+            function formatRelativeAgo(iso) {
+                if (!iso) return "-";
+                const diffSec = Math.max(0, Math.floor((Date.now() - new Date(iso).getTime()) / 1000));
+                if (diffSec < 5) return "hace unos segundos";
+                if (diffSec < 60) return `hace ${diffSec} s`;
+                const mins = Math.floor(diffSec / 60);
+                if (mins < 60) return `hace ${mins} min`;
+                const hrs = Math.floor(mins / 60);
+                return `hace ${hrs} h ${mins % 60} min`;
+            }
+
+            function showToast(msg) {
+                const toast = document.getElementById("toast-notification");
+                toast.textContent = msg;
+                toast.classList.remove("hidden");
+                clearTimeout(toast._timer);
+                toast._timer = setTimeout(() => {
+                    toast.classList.add("hidden");
+                }, 3200);
+            }
+
+            /* AUTENTICACIÓN DEL PANEL */
+            async function initAuth() {
+                if (sessionStorage.getItem(ADMIN_AUTH_SESSION_KEY) === "1") {
+                    unlockDashboard();
+                }
+
+                document.getElementById("admin-login-form").addEventListener("submit", async function (e) {
+                    e.preventDefault();
+                    const pwd = document.getElementById("admin-password-input").value;
+                    const errEl = document.getElementById("admin-login-error");
+
+                    const isValid = await window.EGELSecurity.verifyAdminPassword(pwd);
+                    if (isValid) {
+                        sessionStorage.setItem(ADMIN_AUTH_SESSION_KEY, "1");
+                        errEl.classList.add("hidden");
+                        unlockDashboard();
+                    } else {
+                        errEl.classList.remove("hidden");
+                        document.getElementById("admin-password-input").select();
+                    }
+                });
+
+                document.getElementById("btn-admin-logout").addEventListener("click", function () {
+                    sessionStorage.removeItem(ADMIN_AUTH_SESSION_KEY);
+                    window.location.reload();
+                });
+            }
+
+            function unlockDashboard() {
+                document.getElementById("admin-login-screen").classList.add("hidden");
+                document.getElementById("admin-dashboard-screen").classList.remove("hidden");
+
+                window.EGELSecurity.subscribeToRemoteRelay(() => {
+                    renderAll();
+                });
+                window.EGELSecurity.requestActiveSessionsPing();
+
+                renderAll();
+                if (refreshTimer) clearInterval(refreshTimer);
+                refreshTimer = setInterval(renderAll, 2000);
+            }
+
+            /* RENDERIZADO DE TABLAS Y KPIS */
+            function renderAll() {
+                const sessions = window.EGELSecurity.getAllSessionsComputed();
+                const blocklist = window.EGELSecurity.getBlocklist();
+                const logs = window.EGELSecurity.getAuditLogs();
+
+                const activeCount = sessions.filter(s => s.computedStatus === "Activa").length;
+                const inactiveCount = sessions.filter(s => s.computedStatus === "Inactiva").length;
+                const totalRules =
+                    blocklist.blockedNames.length +
+                    blocklist.blockedEmails.length +
+                    blocklist.blockedDevices.length +
+                    blocklist.blockedTokens.length +
+                    blocklist.blockedIPs.length;
+
+                document.getElementById("kpi-active").textContent = activeCount;
+                document.getElementById("kpi-inactive").textContent = inactiveCount;
+                document.getElementById("kpi-total").textContent = sessions.length;
+                document.getElementById("kpi-blocked").textContent = totalRules;
+
+                renderSessionsTable(sessions);
+                renderBlocklistTable(blocklist);
+                renderAuditTable(logs);
+            }
+
+            function renderSessionsTable(sessions) {
+                const tbody = document.getElementById("sessions-table-body");
+                const query = (document.getElementById("session-search-input").value || "").trim().toLowerCase();
+
+                const filtered = sessions.filter(s => {
+                    if (!query) return true;
+                    return (
+                        (s.firstName && s.firstName.toLowerCase().includes(query)) ||
+                        (s.email && s.email.toLowerCase().includes(query)) ||
+                        (s.deviceId && s.deviceId.toLowerCase().includes(query)) ||
+                        (s.sessionToken && s.sessionToken.toLowerCase().includes(query)) ||
+                        (s.ip && s.ip.toLowerCase().includes(query))
+                    );
+                });
+
+                if (filtered.length === 0) {
+                    tbody.innerHTML = `
+                        <tr>
+                            <td colspan="6" class="empty-state">
+                                No se han detectado sesiones que coincidan con el filtro actual.
+                                Al ingresar un usuario en <code>index.html</code> aparecerá aquí en tiempo real.
+                            </td>
+                        </tr>`;
+                    return;
+                }
+
+                tbody.innerHTML = filtered
+                    .map(s => {
+                        let statusBadge = "";
+                        if (s.computedStatus === "Activa") {
+                            statusBadge = `<span class="status-pill status-activa">&#9679; Activa</span>
+                                <div style="font-size:11px;color:#94a3b8;margin-top:3px;">${escapeHtml(s.subStatus || "En línea")}</div>`;
+                        } else if (s.computedStatus === "Bloqueada") {
+                            statusBadge = `<span class="status-pill status-bloqueada">&#128683; Bloqueada</span>
+                                <div style="font-size:11px;color:#fca5a5;margin-top:3px;">Acceso revocado</div>`;
+                        } else {
+                            statusBadge = `<span class="status-pill status-inactiva">&#9679; Inactiva</span>
+                                <div style="font-size:11px;color:#94a3b8;margin-top:3px;">${escapeHtml(s.subStatus || "Inactiva")}</div>`;
+                        }
+
+                        const isBlocked = s.computedStatus === "Bloqueada";
+
+                        const actionsHtml = isBlocked
+                            ? `<button class="btn btn-secondary btn-sm"
+                                    data-action="unblock-session"
+                                    data-name="${escapeHtml(s.firstName)}"
+                                    data-email="${escapeHtml(s.email)}"
+                                    data-device="${escapeHtml(s.deviceId)}"
+                                    data-token="${escapeHtml(s.sessionToken)}">
+                                    &#128275; Restaurar Acceso
+                               </button>`
+                            : `<div class="action-btns">
+                                    <button class="btn btn-danger btn-sm"
+                                        title="Bloquea Nombre, Correo, Dispositivo y cierra su sesión de inmediato"
+                                        data-action="block-all"
+                                        data-session-id="${escapeHtml(s.sessionId)}"
+                                        data-name="${escapeHtml(s.firstName)}"
+                                        data-email="${escapeHtml(s.email)}"
+                                        data-device="${escapeHtml(s.deviceId)}"
+                                        data-token="${escapeHtml(s.sessionToken)}"
+                                        data-ip="${escapeHtml(s.ip)}">
+                                        &#128683; Revocar Todo
+                                    </button>
+                                    <button class="btn btn-outline-danger btn-sm"
+                                        data-action="block-name"
+                                        data-session-id="${escapeHtml(s.sessionId)}"
+                                        data-name="${escapeHtml(s.firstName)}">
+                                        Bloquear Nombre
+                                    </button>
+                                    <button class="btn btn-outline-danger btn-sm"
+                                        data-action="block-email"
+                                        data-session-id="${escapeHtml(s.sessionId)}"
+                                        data-email="${escapeHtml(s.email)}">
+                                        Bloquear Correo
+                                    </button>
+                                    <button class="btn btn-outline-danger btn-sm"
+                                        data-action="block-device"
+                                        data-session-id="${escapeHtml(s.sessionId)}"
+                                        data-device="${escapeHtml(s.deviceId)}"
+                                        data-token="${escapeHtml(s.sessionToken)}">
+                                        Bloquear Dispositivo
+                                    </button>
+                               </div>`;
+
+                        return `
+                            <tr>
+                                <td>
+                                    <strong style="font-size:14px;color:#f8fafc;">${escapeHtml(s.firstName || "Sin nombre")}</strong>
+                                </td>
+                                <td>
+                                    <span style="color:#38bdf8;">${escapeHtml(s.email || "-")}</span>
+                                </td>
+                                <td>
+                                    <div><strong>${escapeHtml(s.deviceSummary || "Navegador")}</strong></div>
+                                    <span class="mono-tag">ID: ${escapeHtml(s.deviceId || "-")}</span>
+                                    <span class="mono-tag">IP: ${escapeHtml(s.ip || "-")}</span>
+                                    <span class="mono-tag">Token: ${escapeHtml(s.sessionToken || "-")}</span>
+                                </td>
+                                <td>
+                                    <div><strong>Ingreso:</strong> ${escapeHtml(formatDateTime(s.loginTime))}</div>
+                                    <div style="color:#94a3b8;font-size:12px;">
+                                        <strong>Últ. actividad:</strong> ${escapeHtml(formatRelativeAgo(s.lastActivity))}
+                                    </div>
+                                </td>
+                                <td>${statusBadge}</td>
+                                <td>${actionsHtml}</td>
+                            </tr>
+                        `;
+                    })
+                    .join("");
+            }
+
+            function renderBlocklistTable(bl) {
+                const tbody = document.getElementById("blocklist-table-body");
+                const items = [];
+
+                bl.blockedNames.forEach(val => items.push({ type: "Primer Nombre", key: "firstName", value: val }));
+                bl.blockedEmails.forEach(val => items.push({ type: "Correo Electrónico", key: "email", value: val }));
+                bl.blockedDevices.forEach(val => items.push({ type: "Dispositivo", key: "deviceId", value: val }));
+                bl.blockedTokens.forEach(val => items.push({ type: "Token de Sesión", key: "sessionToken", value: val }));
+                bl.blockedIPs.forEach(val => items.push({ type: "Dirección IP", key: "ip", value: val }));
+
+                if (items.length === 0) {
+                    tbody.innerHTML = `
+                        <tr>
+                            <td colspan="3" class="empty-state">No hay usuarios, correos ni dispositivos bloqueados actualmente.</td>
+                        </tr>`;
+                    return;
+                }
+
+                tbody.innerHTML = items
+                    .map(item => `
+                        <tr>
+                            <td>
+                                <span style="font-size:11px;text-transform:uppercase;color:#f87171;font-weight:700;">
+                                    ${escapeHtml(item.type)}
+                                </span>
+                                <div><strong class="mono-tag" style="font-size:12.5px;">${escapeHtml(item.value)}</strong></div>
+                            </td>
+                            <td style="font-size:12px;color:#94a3b8;">
+                                Bloqueo activo permanente
+                            </td>
+                            <td>
+                                <button class="btn btn-secondary btn-sm"
+                                    data-action="unblock-single"
+                                    data-key="${escapeHtml(item.key)}"
+                                    data-val="${escapeHtml(item.value)}">
+                                    &#128275; Desbloquear
+                                </button>
+                            </td>
+                        </tr>
+                    `)
+                    .join("");
+            }
+
+            function renderAuditTable(logs) {
+                const tbody = document.getElementById("audit-table-body");
+                if (!logs || logs.length === 0) {
+                    tbody.innerHTML = `
+                        <tr>
+                            <td colspan="6" class="empty-state">Sin eventos registrados aún.</td>
+                        </tr>`;
+                    return;
+                }
+
+                const labels = {
+                    USER_IDENTIFIED_STEP1: "Paso 1 Completado (Nombre y Correo)",
+                    SIMULATOR_UNLOCKED: "Simulador Desbloqueado (Sesión Activa)",
+                    FAILED_PASSWORD: "Intento Fallido de Contraseña",
+                    BLOCKED_LOGIN_ATTEMPT: "Intento de Acceso Bloqueado",
+                    ACCESS_REVOKED: "Acceso Revocado por Administrador",
+                    ACCESS_RESTORED: "Acceso Restaurado por Administrador"
+                };
+
+                tbody.innerHTML = logs
+                    .slice(0, 40)
+                    .map(l => `
+                        <tr>
+                            <td style="white-space:nowrap;font-size:12px;color:#94a3b8;">${escapeHtml(formatDateTime(l.timestamp))}</td>
+                            <td><strong>${escapeHtml(labels[l.action] || l.action)}</strong></td>
+                            <td>${escapeHtml(l.firstName || "-")}</td>
+                            <td>${escapeHtml(l.email || "-")}</td>
+                            <td><span class="mono-tag">${escapeHtml(l.deviceId || "-")}</span> <span class="mono-tag">${escapeHtml(l.ip || "")}</span></td>
+                            <td style="font-size:12px;color:#cbd5e1;">${escapeHtml(l.reason || l.matchedBy || "-")}</td>
+                        </tr>
+                    `)
+                    .join("");
+            }
+
+            /* DELEGACIÓN DE EVENTOS DE BLOQUEO Y DESBLOQUEO */
+            document.addEventListener("click", function (e) {
+                const btn = e.target.closest("button[data-action]");
+                if (!btn) return;
+
+                const action = btn.getAttribute("data-action");
+                const sessionId = btn.getAttribute("data-session-id");
+                const firstName = btn.getAttribute("data-name");
+                const email = btn.getAttribute("data-email");
+                const deviceId = btn.getAttribute("data-device");
+                const sessionToken = btn.getAttribute("data-token");
+                const ip = btn.getAttribute("data-ip");
+
+                if (action === "block-all") {
+                    window.EGELSecurity.blockAccess({
+                        sessionId,
+                        firstName,
+                        email,
+                        deviceId,
+                        sessionToken,
+                        ip,
+                        reason: "Revocación total desde Panel Administrativo (Nombre, Correo y Dispositivo)"
+                    });
+                    showToast(`Acceso revocado inmediatamente para ${firstName} (${email})`);
+                    renderAll();
+                } else if (action === "block-name") {
+                    window.EGELSecurity.blockAccess({
+                        sessionId,
+                        firstName,
+                        reason: `Bloqueado por Primer Nombre (${firstName})`
+                    });
+                    showToast(`Usuario "${firstName}" bloqueado y sesión cerrada.`);
+                    renderAll();
+                } else if (action === "block-email") {
+                    window.EGELSecurity.blockAccess({
+                        sessionId,
+                        email,
+                        reason: `Bloqueado por Correo Electrónico (${email})`
+                    });
+                    showToast(`Correo "${email}" bloqueado y sesión cerrada.`);
+                    renderAll();
+                } else if (action === "block-device") {
+                    window.EGELSecurity.blockAccess({
+                        sessionId,
+                        deviceId,
+                        sessionToken,
+                        reason: `Bloqueado por Dispositivo (${deviceId}) y Token (${sessionToken})`
+                    });
+                    showToast(`Dispositivo "${deviceId}" bloqueado permanentemente.`);
+                    renderAll();
+                } else if (action === "unblock-session") {
+                    window.EGELSecurity.unblockAccess({
+                        firstName,
+                        email,
+                        deviceId,
+                        sessionToken
+                    });
+                    showToast(`Acceso restaurado para ${firstName || email}`);
+                    renderAll();
+                } else if (action === "unblock-single") {
+                    const key = btn.getAttribute("data-key");
+                    const val = btn.getAttribute("data-val");
+                    window.EGELSecurity.unblockAccess({ [key]: val });
+                    showToast(`Desbloqueado: ${val}`);
+                    renderAll();
+                }
+            });
+
+            /* FORMULARIO DE BLOQUEO MANUAL */
+            document.getElementById("manual-block-form").addEventListener("submit", function (e) {
+                e.preventDefault();
+                const firstName = document.getElementById("block-name-input").value.trim();
+                const email = document.getElementById("block-email-input").value.trim();
+                const devOrToken = document.getElementById("block-device-input").value.trim();
+                const reason = document.getElementById("block-reason-input").value.trim();
+
+                if (!firstName && !email && !devOrToken) {
+                    showToast("Ingresa al menos un Nombre, Correo o ID de Dispositivo/Token para bloquear.");
+                    return;
+                }
+
+                const opts = { reason: reason || "Bloqueo manual por el Administrador" };
+                if (firstName) opts.firstName = firstName;
+                if (email) opts.email = email;
+                if (devOrToken) {
+                    if (devOrToken.toUpperCase().startsWith("TOK-")) {
+                        opts.sessionToken = devOrToken;
+                    } else if (/^\d{1,3}(\.\d{1,3}){3}$/.test(devOrToken)) {
+                        opts.ip = devOrToken;
+                    } else {
+                        opts.deviceId = devOrToken;
+                    }
+                }
+
+                window.EGELSecurity.blockAccess(opts);
+                e.target.reset();
+                showToast("Regla de bloqueo aplicada y transmitida en tiempo real.");
+                renderAll();
+            });
+
+            /* CONTROLES DE CABECERA */
+            document.getElementById("session-search-input").addEventListener("input", renderAll);
+
+            document.getElementById("btn-ping-sessions").addEventListener("click", function () {
+                window.EGELSecurity.requestActiveSessionsPing();
+                renderAll();
+                showToast("Sondeo de sesiones activas enviado.");
+            });
+
+            document.getElementById("btn-clear-inactive").addEventListener("click", function () {
+                window.EGELSecurity.clearInactiveSessions();
+                renderAll();
+                showToast("Sesiones inactivas limpiadas de la vista.");
+            });
+
+            document.getElementById("btn-export-blocklist").addEventListener("click", function () {
+                const bl = window.EGELSecurity.getBlocklist();
+                const blob = new Blob([JSON.stringify(bl, null, 2)], { type: "application/json" });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement("a");
+                a.href = url;
+                a.download = "blocklist.json";
+                a.click();
+                URL.revokeObjectURL(url);
+                showToast("Archivo blocklist.json descargado.");
+            });
+
+            document.getElementById("input-import-blocklist").addEventListener("change", function (e) {
+                const file = e.target.files && e.target.files[0];
+                if (!file) return;
+                const reader = new FileReader();
+                reader.onload = function (evt) {
+                    try {
+                        const parsed = JSON.parse(evt.target.result);
+                        window.EGELSecurity.mergeIncomingBlocklist(parsed, false);
+                        renderAll();
+                        showToast("blocklist.json importado y sincronizado.");
+                    } catch (err) {
+                        showToast("Error: Archivo JSON inválido.");
+                    }
+                };
+                reader.readAsText(file);
+            });
+
+            window.addEventListener("egel:security-update", renderAll);
+
+            initAuth();
+        })();
+    </script>
+</body>
+</html>
+
