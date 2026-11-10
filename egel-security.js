@@ -1,7 +1,7 @@
 /**
  * EGEL 2026 - Sistema de Identificación, Telemetría de Sesiones y Control de Acceso (Zero-DB)
  * Funciona 100% sin base de datos mediante:
- *  1. Memoria + Almacenamiento Local (localStorage / sessionStorage / IndexedDB / Cookies)
+ *  1. Memoria + Almacenamiento Local (localStorage / sessionStorage / Cookies)
  *  2. Sincronización multi-pestaña en tiempo real (BroadcastChannel + Storage Events)
  *  3. Archivo estático de configuración (blocklist.json)
  *  4. Canal ligero de estado en tiempo real entre dispositivos (Pub/Sub SSE sin BD)
@@ -9,7 +9,6 @@
 (function (window, document) {
     "use strict";
 
-    // Evitar doble inicialización en el mismo contexto
     if (window.__EGEL_SECURITY_ACTIVE__) {
         return;
     }
@@ -23,17 +22,16 @@
         LOCAL_BAN_FLAG: "__egel2026_sec_device_banned_v1",
         CURRENT_SESSION: "__egel2026_sec_current_session_v1",
         ADMIN_HASH: "__egel2026_sec_admin_hash_v1",
-        RELAY_TOPIC: "__egel2026_sec_relay_topic_v1"
+        RELAY_TOPIC: "__egel2026_sec_relay_topic_v1",
+        EMERGENCY_UNBLOCK_DONE: "__egel2026_unblock_kaory_22011435_v1"
     };
 
     const CHANNEL_NAME = "egel2026_security_realtime_bus";
-    const DEFAULT_RELAY_TOPIC = "egel2026_sec_sync_kgca_9f8a7b6c5d";
+    const DEFAULT_RELAY_TOPIC = "egel2026_sec_sync_kgca_v2";
     const HEARTBEAT_INTERVAL_MS = 4000;
-    const INACTIVE_THRESHOLD_MS = 90 * 1000; // 90s sin interacción = Inactiva
-    const OFFLINE_THRESHOLD_MS = 18 * 1000;  // 18s sin heartbeat = Desconectada
+    const INACTIVE_THRESHOLD_MS = 90 * 1000;
+    const OFFLINE_THRESHOLD_MS = 18 * 1000;
 
-    // SHA-256 precalculado de la contraseña del creador: "EGEL2026KGCA"
-    // Se verifica también con WebCrypto SHA-256 en tiempo de ejecución
     const DEFAULT_ADMIN_PASSWORD_PLAIN = "EGEL2026KGCA";
 
     let broadcastChannel = null;
@@ -45,7 +43,6 @@
         broadcastChannel = null;
     }
 
-    // Estado en memoria de la sesión actual
     let currentSession = null;
     let cachedIP = "Detectando...";
     let cachedDeviceId = null;
@@ -54,6 +51,22 @@
     let blockCheckTimer = null;
     let eventSourceRelay = null;
     let lastActivityTimestamp = Date.now();
+
+    /**
+     * Detecta si estamos en el Panel Administrativo (admin.html).
+     * El panel administrativo JAMÁS debe ser bloqueado por reglas de usuarios/dispositivos.
+     */
+    function isAdminPanelContext() {
+        try {
+            if (window.__EGEL_IS_ADMIN_PANEL__ === true) return true;
+            if (document.getElementById("admin-login-screen") || document.getElementById("admin-dashboard-screen")) {
+                return true;
+            }
+            const path = String(window.location.pathname || window.location.href || "").toLowerCase();
+            if (path.includes("admin.html")) return true;
+        } catch (e) {}
+        return false;
+    }
 
     /* ==========================================================================
        1. UTILIDADES DE CRIPTOGRAFÍA Y HUELLA DE DISPOSITIVO (FINGERPRINTING)
@@ -65,7 +78,6 @@
 
     function normalizeFirstName(val) {
         const clean = String(val || "").trim().replace(/\s+/g, " ");
-        // Extraer el primer nombre si ingresaron varios o normalizar
         return clean.toLowerCase();
     }
 
@@ -82,9 +94,7 @@
                 const hashArray = Array.from(new Uint8Array(hashBuffer));
                 return hashArray.map(b => b.toString(16).padStart(2, "0")).join("");
             }
-        } catch (e) {
-            // Fallback determinista FNV-1a extendido si se abre en contexto sin subtle
-        }
+        } catch (e) {}
         let h1 = 0xdeadbeef ^ text.length;
         let h2 = 0x41c6ce57 ^ text.length;
         for (let i = 0, ch; i < text.length; i++) {
@@ -204,9 +214,7 @@
                     return cachedIP;
                 }
             }
-        } catch (e) {
-            // Fallback sin conexión o sandbox
-        }
+        } catch (e) {}
         if (cachedIP === "Detectando...") {
             cachedIP = "Local / Red Privada";
             if (currentSession) {
@@ -272,6 +280,49 @@
         }
     }
 
+    /**
+     * Desbloqueo automático de rescate para la cuenta de la creadora (KAORY / 22011435@itsoeh.edu.mx)
+     * y su dispositivo actual.
+     */
+    function runCreatorAccountRescue() {
+        try {
+            localStorage.removeItem(STORAGE_KEYS.LOCAL_BAN_FLAG);
+            const alreadyRescued = localStorage.getItem(STORAGE_KEYS.EMERGENCY_UNBLOCK_DONE);
+            if (!alreadyRescued) {
+                const myDev = getOrCreateDeviceId();
+                const hwFp = computeHardwareFingerprint();
+                const bl = getBlocklist();
+
+                bl.blockedNames = bl.blockedNames.filter(n => normalizeStr(n) !== "kaory");
+                bl.blockedEmails = bl.blockedEmails.filter(e => normalizeStr(e) !== "22011435@itsoeh.edu.mx");
+                bl.blockedDevices = bl.blockedDevices.filter(
+                    d => normalizeStr(d) !== normalizeStr(myDev) && normalizeStr(d) !== normalizeStr(hwFp)
+                );
+                bl.blockedTokens = [];
+                bl.rules = bl.rules.filter(r => {
+                    if (r.firstName && normalizeStr(r.firstName) === "kaory") return false;
+                    if (r.email && normalizeStr(r.email) === "22011435@itsoeh.edu.mx") return false;
+                    if (r.deviceId && (normalizeStr(r.deviceId) === normalizeStr(myDev) || normalizeStr(r.deviceId) === normalizeStr(hwFp))) return false;
+                    return true;
+                });
+
+                const map = getSessionsMap();
+                Object.values(map).forEach(s => {
+                    if (
+                        normalizeStr(s.firstName) === "kaory" ||
+                        normalizeStr(s.email) === "22011435@itsoeh.edu.mx" ||
+                        normalizeStr(s.deviceId) === normalizeStr(myDev)
+                    ) {
+                        s.status = "Inactiva";
+                    }
+                });
+                saveSessionsMap(map);
+                saveBlocklist(bl, true);
+                localStorage.setItem(STORAGE_KEYS.EMERGENCY_UNBLOCK_DONE, "1");
+            }
+        } catch (e) {}
+    }
+
     async function syncStaticBlocklistFile() {
         try {
             const res = await fetch("blocklist.json?t=" + Date.now(), { cache: "no-store" });
@@ -279,9 +330,7 @@
             const fileBl = await res.json();
             if (!fileBl || typeof fileBl !== "object") return;
             mergeIncomingBlocklist(fileBl, false);
-        } catch (e) {
-            // Ignorar si se abre bajo protocolo file:// donde fetch local está restringido
-        }
+        } catch (e) {}
     }
 
     function mergeIncomingBlocklist(incoming, replaceAll = false) {
@@ -369,10 +418,6 @@
        3. VERIFICACIÓN DE BLOQUEO Y REVOCACIÓN INMEDIATA
        ========================================================================== */
 
-    /**
-     * Evalúa si una combinación de usuario/correo/dispositivo/token/IP está bloqueada.
-     * Retorna { blocked: boolean, reason: string, matchedBy: string, matchedValue: string }
-     */
     function checkIsBlocked(params = {}) {
         const bl = getBlocklist();
         const deviceId = params.deviceId || getOrCreateDeviceId();
@@ -389,7 +434,7 @@
             (deviceId && blockedDevicesNorm.includes(normalizeStr(deviceId))) ||
             (hwFp && blockedDevicesNorm.includes(normalizeStr(hwFp)))
         ) {
-            markLocalDeviceBanned(deviceId);
+            markLocalDeviceBanned({ deviceId, matchedBy: "Dispositivo", matchedValue: deviceId });
             return {
                 blocked: true,
                 matchedBy: "Dispositivo",
@@ -403,7 +448,6 @@
             const localBan = localStorage.getItem(STORAGE_KEYS.LOCAL_BAN_FLAG);
             if (localBan) {
                 const banData = JSON.parse(localBan);
-                // Confirmar que la regla siga activa en blocklist (para permitir desbloqueo desde admin)
                 const stillInRules =
                     blockedDevicesNorm.includes(normalizeStr(banData.deviceId || deviceId)) ||
                     bl.blockedTokens.map(normalizeStr).includes(normalizeStr(banData.sessionToken || "")) ||
@@ -464,7 +508,7 @@
             }
         }
 
-        // 5. Verificar bloqueo por IP (si es una IP real pública)
+        // 5. Verificar bloqueo por IP
         if (ip && ip !== "Detectando..." && ip !== "Local / Red Privada") {
             const blockedIPsNorm = bl.blockedIPs.map(normalizeStr);
             if (blockedIPsNorm.includes(normalizeStr(ip))) {
@@ -481,6 +525,7 @@
     }
 
     function markLocalDeviceBanned(info = {}) {
+        if (isAdminPanelContext()) return;
         try {
             localStorage.setItem(
                 STORAGE_KEYS.LOCAL_BAN_FLAG,
@@ -507,9 +552,11 @@
     }
 
     /**
-     * Cierra inmediatamente la sesión activa y reemplaza toda la pantalla con el aviso de bloqueo.
+     * Cierra inmediatamente la sesión activa del simulador y reemplaza la pantalla con el aviso de bloqueo.
+     * JAMÁS bloquea admin.html.
      */
     function enforceImmediateRevocation(blockResult) {
+        if (isAdminPanelContext()) return;
         if (isRevokedScreenShown) return;
         isRevokedScreenShown = true;
 
@@ -533,7 +580,6 @@
         const reason = blockResult.reason || "Tu acceso al Simulador EGEL ha sido revocado por el administrador.";
         const devId = getOrCreateDeviceId();
 
-        // Destruir el DOM del simulador para impedir cualquier uso posterior
         try {
             document.title = "Acceso Revocado - Simulador EGEL";
             document.documentElement.innerHTML = `
@@ -694,7 +740,6 @@
                 try { eventSourceRelay.close(); } catch (e) {}
             }
             const topic = getRelayTopic();
-            // since=2h permite recuperar sesiones y bloqueos recientes al abrir admin.html en cualquier dispositivo
             const url = `https://ntfy.sh/${encodeURIComponent(topic)}/sse?since=2h`;
             const es = new EventSource(url);
             eventSourceRelay = es;
@@ -711,9 +756,7 @@
                     }
                 } catch (err) {}
             };
-            es.onerror = function () {
-                // Silencioso si no hay red o está en entorno restringido
-            };
+            es.onerror = function () {};
         } catch (e) {}
     }
 
@@ -728,13 +771,32 @@
                 saveSessionsMap(map);
             }
         } else if (data.type === "BLOCKLIST_UPDATED" && data.blocklist) {
-            saveBlocklist(data.blocklist, false);
-            checkAndEnforceCurrentSessionBlock();
-        } else if (data.type === "REVOKE_COMMAND") {
-            if (data.blocklist) {
+            const currentBl = getBlocklist();
+            if (!currentBl.updatedAt || new Date(data.blocklist.updatedAt || 0) >= new Date(currentBl.updatedAt || 0)) {
                 saveBlocklist(data.blocklist, false);
             }
-            // Verificar si esta sesión es el objetivo de la revocación
+            if (!isAdminPanelContext()) {
+                const checkRes = checkAndEnforceCurrentSessionBlock();
+                if (!checkRes.blocked && isRevokedScreenShown) {
+                    try {
+                        localStorage.removeItem(STORAGE_KEYS.LOCAL_BAN_FLAG);
+                    } catch (e) {}
+                    window.location.reload();
+                }
+            }
+        } else if (data.type === "REVOKE_COMMAND") {
+            const currentBl = getBlocklist();
+            const isNewerOrEqual =
+                !data.blocklist ||
+                !currentBl.updatedAt ||
+                new Date(data.blocklist.updatedAt || 0) >= new Date(currentBl.updatedAt || 0);
+
+            if (data.blocklist && isNewerOrEqual) {
+                saveBlocklist(data.blocklist, false);
+            }
+            if (isAdminPanelContext() || !isNewerOrEqual) {
+                return;
+            }
             if (currentSession) {
                 const targetMatch =
                     (data.sessionId && data.sessionId === currentSession.sessionId) ||
@@ -766,8 +828,7 @@
                 } catch (e) {}
             }
         } else if (data.type === "ADMIN_PING_SESSIONS") {
-            // Si somos un cliente activo, respondemos inmediatamente con nuestro estado actual
-            if (currentSession && !isRevokedScreenShown) {
+            if (!isAdminPanelContext() && currentSession && !isRevokedScreenShown) {
                 saveAndBroadcastSession(currentSession, true);
             }
         }
@@ -785,7 +846,9 @@
     window.addEventListener("storage", function (ev) {
         if (!ev.key) return;
         if (ev.key === STORAGE_KEYS.BLOCKLIST || ev.key === STORAGE_KEYS.LOCAL_BAN_FLAG) {
-            checkAndEnforceCurrentSessionBlock();
+            if (!isAdminPanelContext()) {
+                checkAndEnforceCurrentSessionBlock();
+            }
             window.dispatchEvent(new CustomEvent("egel:security-update", { detail: { type: "STORAGE_BLOCKLIST" } }));
         } else if (ev.key === STORAGE_KEYS.SESSIONS || ev.key === STORAGE_KEYS.AUDIT_LOG) {
             window.dispatchEvent(new CustomEvent("egel:security-update", { detail: { type: "STORAGE_SESSIONS" } }));
@@ -819,6 +882,10 @@
     }
 
     function checkAndEnforceCurrentSessionBlock() {
+        if (isAdminPanelContext()) {
+            return { blocked: false };
+        }
+
         const checkParams = currentSession
             ? {
                   firstName: currentSession.firstName,
@@ -834,28 +901,17 @@
 
         const res = checkIsBlocked(checkParams);
         if (res.blocked) {
-            // Si estamos dentro del simulador desbloqueado, destruir inmediatamente la vista
-            const isUnlockedSimulator =
-                !document.getElementById("staticrypt-form") ||
-                document.querySelector('script[data-context="unlocked"]') !== null;
-
-            if (isUnlockedSimulator || currentSession) {
-                enforceImmediateRevocation(res);
-            }
+            enforceImmediateRevocation(res);
             return res;
         }
         return { blocked: false };
     }
 
-    /**
-     * Registra el Paso 1 (Identificación de Primer Nombre + Correo Electrónico) antes de la contraseña.
-     */
     function registerIdentifiedUser(firstNameInput, emailInput) {
         const firstName = String(firstNameInput || "").trim().replace(/\s+/g, " ");
         const email = String(emailInput || "").trim().toLowerCase();
         const deviceId = getOrCreateDeviceId();
 
-        // Validar si está bloqueado antes de permitir pasar a la contraseña
         const blockCheck = checkIsBlocked({
             firstName,
             email,
@@ -879,7 +935,6 @@
             };
         }
 
-        // Recuperar o crear sesión para esta pestaña
         let existing = null;
         try {
             const raw = sessionStorage.getItem(STORAGE_KEYS.CURRENT_SESSION);
@@ -915,7 +970,7 @@
             deviceId,
             sessionToken,
             ip: cachedIP
-        });
+        }, false);
 
         startSessionMonitoring(false);
         return {
@@ -948,7 +1003,7 @@
                 deviceId: currentSession.deviceId,
                 sessionToken: currentSession.sessionToken,
                 ip: currentSession.ip
-            });
+            }, false);
         } else {
             currentSession.failedPasswordAttempts = (currentSession.failedPasswordAttempts || 0) + 1;
             currentSession.status = `Contraseña Incorrecta (${currentSession.failedPasswordAttempts})`;
@@ -960,14 +1015,15 @@
                 deviceId: currentSession.deviceId,
                 sessionToken: currentSession.sessionToken,
                 ip: currentSession.ip
-            });
+            }, false);
         }
     }
 
     let lastRemoteHeartbeatTime = 0;
 
     function startSessionMonitoring(isInsideUnlockedSimulator = false) {
-        // Cargar sesión guardada en sessionStorage si venimos de document.write(plainHTML)
+        if (isAdminPanelContext()) return;
+
         if (!currentSession) {
             try {
                 const raw = sessionStorage.getItem(STORAGE_KEYS.CURRENT_SESSION);
@@ -984,18 +1040,13 @@
             saveAndBroadcastSession(currentSession, true);
         }
 
-        // Verificar inmediatamente si está bloqueado
         const initialBlock = checkAndEnforceCurrentSessionBlock();
         if (initialBlock.blocked) return;
 
-        // Detectar IP pública en segundo plano
         detectPublicIP();
-
-        // Sincronizar blocklist.json estático y suscribirse al relay remoto
         syncStaticBlocklistFile();
         subscribeToRemoteRelay();
 
-        // Escuchar eventos de actividad del usuario
         const markActivity = () => {
             const now = Date.now();
             lastActivityTimestamp = now;
@@ -1039,10 +1090,9 @@
             }
         });
 
-        // Intervalo de Heartbeat y verificación continua de bloqueos
         if (heartbeatTimer) clearInterval(heartbeatTimer);
         heartbeatTimer = setInterval(() => {
-            if (isRevokedScreenShown) return;
+            if (isRevokedScreenShown || isAdminPanelContext()) return;
 
             const blockRes = checkAndEnforceCurrentSessionBlock();
             if (blockRes.blocked) return;
@@ -1056,7 +1106,6 @@
                         currentSession.status = "Activa";
                     }
                 }
-                // Publicar en relay remoto cada 20 segundos para no saturar, y local cada 4s
                 const now = Date.now();
                 const shouldPublishRemote = now - lastRemoteHeartbeatTime > 20000;
                 if (shouldPublishRemote) lastRemoteHeartbeatTime = now;
@@ -1066,7 +1115,7 @@
 
         if (blockCheckTimer) clearInterval(blockCheckTimer);
         blockCheckTimer = setInterval(() => {
-            if (!isRevokedScreenShown) {
+            if (!isRevokedScreenShown && !isAdminPanelContext()) {
                 checkAndEnforceCurrentSessionBlock();
             }
         }, 1500);
@@ -1097,9 +1146,6 @@
         return true;
     }
 
-    /**
-     * Obtiene todas las sesiones detectadas con cálculo dinámico de estado (Activa / Inactiva / Desconectada / Bloqueada)
-     */
     function getAllSessionsComputed() {
         const map = getSessionsMap();
         const now = Date.now();
@@ -1138,7 +1184,6 @@
             return copy;
         });
 
-        // Ordenar: primero Activas, luego por actividad más reciente
         list.sort((a, b) => {
             if (a.computedStatus === "Activa" && b.computedStatus !== "Activa") return -1;
             if (a.computedStatus !== "Activa" && b.computedStatus === "Activa") return 1;
@@ -1148,9 +1193,6 @@
         return list;
     }
 
-    /**
-     * Bloquea / Revoca el acceso por Primer Nombre, Correo, Dispositivo, Token o IP (o todos a la vez).
-     */
     function blockAccess(options = {}) {
         const bl = getBlocklist();
         const addedTargets = [];
@@ -1194,7 +1236,6 @@
         };
         bl.rules.unshift(ruleEntry);
 
-        // Actualizar estado de las sesiones afectadas en el mapa local
         const map = getSessionsMap();
         Object.values(map).forEach(s => {
             const match =
@@ -1209,7 +1250,7 @@
             }
         });
         saveSessionsMap(map);
-        saveBlocklist(bl, true);
+        saveBlocklist(bl, false);
 
         const revokePayload = {
             type: "REVOKE_COMMAND",
@@ -1237,14 +1278,11 @@
             sessionToken: options.sessionToken || "-",
             matchedBy: revokePayload.matchedBy,
             reason: ruleEntry.reason
-        });
+        }, false);
 
         return { success: true, rule: ruleEntry, blocklist: bl };
     }
 
-    /**
-     * Desbloquea una regla o valor específico desde el panel administrativo.
-     */
     function unblockAccess(criteria = {}) {
         const bl = getBlocklist();
 
@@ -1290,7 +1328,6 @@
             bl.blockedIPs = bl.blockedIPs.filter(x => normalizeStr(x) !== normalizeStr(criteria.ip));
         }
 
-        // Limpiar reglas huérfanas que coincidan con los criterios desbloqueados
         if (criteria.firstName || criteria.email || criteria.deviceId || criteria.sessionToken) {
             bl.rules = bl.rules.filter(r => {
                 if (criteria.firstName && r.firstName && normalizeFirstName(r.firstName) === normalizeFirstName(criteria.firstName)) return false;
@@ -1305,7 +1342,6 @@
             localStorage.removeItem(STORAGE_KEYS.LOCAL_BAN_FLAG);
         } catch (e) {}
 
-        // Actualizar estado de sesiones que estaban marcadas como Bloqueada
         const map = getSessionsMap();
         Object.values(map).forEach(s => {
             const stillBlocked = checkIsBlocked({
@@ -1328,7 +1364,7 @@
             email: criteria.email || "-",
             deviceId: criteria.deviceId || "-",
             reason: "Desbloqueado por el administrador"
-        });
+        }, false);
 
         return bl;
     }
@@ -1358,13 +1394,14 @@
         publishToRemoteRelay(ping);
     }
 
-    // Auto-arranque si el script fue inyectado dentro del simulador ya desencriptado
+    // Ejecutar rescate inmediato de la cuenta de la creadora (KAORY / 22011435@itsoeh.edu.mx)
+    runCreatorAccountRescue();
+
     const currentScript = document.currentScript;
     if (currentScript && currentScript.getAttribute("data-context") === "unlocked") {
         startSessionMonitoring(true);
     }
 
-    // Exponer API global
     window.EGELSecurity = {
         getOrCreateDeviceId,
         detectPublicIP,
@@ -1395,4 +1432,3 @@
         }
     };
 })(window, document);
-
