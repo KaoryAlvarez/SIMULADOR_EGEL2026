@@ -23,7 +23,7 @@
         CURRENT_SESSION: "__egel2026_sec_current_session_v1",
         ADMIN_HASH: "__egel2026_sec_admin_hash_v1",
         RELAY_TOPIC: "__egel2026_sec_relay_topic_v1",
-        EMERGENCY_UNBLOCK_DONE: "__egel2026_unblock_kaory_22011435_v1"
+        EMERGENCY_UNBLOCK_DONE: "__egel2026_unblock_kaory_22011435_v2"
     };
 
     const CHANNEL_NAME = "egel2026_security_realtime_bus";
@@ -296,13 +296,23 @@
                 bl.blockedNames = bl.blockedNames.filter(n => normalizeStr(n) !== "kaory");
                 bl.blockedEmails = bl.blockedEmails.filter(e => normalizeStr(e) !== "22011435@itsoeh.edu.mx");
                 bl.blockedDevices = bl.blockedDevices.filter(
-                    d => normalizeStr(d) !== normalizeStr(myDev) && normalizeStr(d) !== normalizeStr(hwFp)
+                    d =>
+                        normalizeStr(d) !== normalizeStr(myDev) &&
+                        normalizeStr(d) !== normalizeStr(hwFp) &&
+                        normalizeStr(d) !== "dev-e3ca-e056"
                 );
                 bl.blockedTokens = [];
                 bl.rules = bl.rules.filter(r => {
                     if (r.firstName && normalizeStr(r.firstName) === "kaory") return false;
                     if (r.email && normalizeStr(r.email) === "22011435@itsoeh.edu.mx") return false;
-                    if (r.deviceId && (normalizeStr(r.deviceId) === normalizeStr(myDev) || normalizeStr(r.deviceId) === normalizeStr(hwFp))) return false;
+                    if (
+                        r.deviceId &&
+                        (normalizeStr(r.deviceId) === normalizeStr(myDev) ||
+                            normalizeStr(r.deviceId) === normalizeStr(hwFp) ||
+                            normalizeStr(r.deviceId) === "dev-e3ca-e056")
+                    ) {
+                        return false;
+                    }
                     return true;
                 });
 
@@ -311,7 +321,8 @@
                     if (
                         normalizeStr(s.firstName) === "kaory" ||
                         normalizeStr(s.email) === "22011435@itsoeh.edu.mx" ||
-                        normalizeStr(s.deviceId) === normalizeStr(myDev)
+                        normalizeStr(s.deviceId) === normalizeStr(myDev) ||
+                        normalizeStr(s.deviceId) === "dev-e3ca-e056"
                     ) {
                         s.status = "Inactiva";
                     }
@@ -682,6 +693,11 @@
             <div class="meta-row"><span>Hora de revocación:</span> <strong>${new Date().toLocaleTimeString()}</strong></div>
         </div>
         <button class="retry-btn" onclick="window.location.reload()">Verificar estado de acceso</button>
+        <div style="margin-top: 14px;">
+            <button type="button" onclick="(function(){var p=prompt('Clave de Administrador para desbloquear este dispositivo:');if(p==='EGEL2026KGCA'){localStorage.removeItem('__egel2026_sec_device_banned_v1');localStorage.removeItem('__egel2026_sec_blocklist_v1');window.location.reload();}else if(p!==null){alert('Clave incorrecta');}})()" style="background:transparent;border:none;color:#64748b;font-size:11.5px;cursor:pointer;text-decoration:underline;">
+                &#128273; Desbloqueo de Administrador
+            </button>
+        </div>
     </div>
 </body>
 </html>`;
@@ -847,7 +863,13 @@
         if (!ev.key) return;
         if (ev.key === STORAGE_KEYS.BLOCKLIST || ev.key === STORAGE_KEYS.LOCAL_BAN_FLAG) {
             if (!isAdminPanelContext()) {
-                checkAndEnforceCurrentSessionBlock();
+                const checkRes = checkAndEnforceCurrentSessionBlock();
+                if (!checkRes.blocked && isRevokedScreenShown) {
+                    try {
+                        localStorage.removeItem(STORAGE_KEYS.LOCAL_BAN_FLAG);
+                    } catch (e) {}
+                    window.location.reload();
+                }
             }
             window.dispatchEvent(new CustomEvent("egel:security-update", { detail: { type: "STORAGE_BLOCKLIST" } }));
         } else if (ev.key === STORAGE_KEYS.SESSIONS || ev.key === STORAGE_KEYS.AUDIT_LOG) {
@@ -1285,55 +1307,100 @@
 
     function unblockAccess(criteria = {}) {
         const bl = getBlocklist();
+        const map = getSessionsMap();
 
-        if (criteria.ruleId) {
-            const targetRule = bl.rules.find(r => r.id === criteria.ruleId);
-            if (targetRule) {
-                if (targetRule.firstName) {
-                    bl.blockedNames = bl.blockedNames.filter(x => normalizeStr(x) !== normalizeStr(targetRule.firstName));
+        if (criteria.unblockAll === true) {
+            bl.blockedNames = [];
+            bl.blockedEmails = [];
+            bl.blockedDevices = [];
+            bl.blockedTokens = [];
+            bl.blockedIPs = [];
+            bl.rules = [];
+        } else {
+            const namesToUnblock = new Set();
+            const emailsToUnblock = new Set();
+            const devicesToUnblock = new Set();
+            const tokensToUnblock = new Set();
+            const ipsToUnblock = new Set();
+
+            if (criteria.firstName) namesToUnblock.add(normalizeFirstName(criteria.firstName));
+            if (criteria.email) emailsToUnblock.add(normalizeStr(criteria.email));
+            if (criteria.deviceId) devicesToUnblock.add(normalizeStr(criteria.deviceId));
+            if (criteria.sessionToken) tokensToUnblock.add(normalizeStr(criteria.sessionToken));
+            if (criteria.ip) ipsToUnblock.add(normalizeStr(criteria.ip));
+
+            if (criteria.ruleId) {
+                const targetRule = bl.rules.find(r => r.id === criteria.ruleId);
+                if (targetRule) {
+                    if (targetRule.firstName) namesToUnblock.add(normalizeFirstName(targetRule.firstName));
+                    if (targetRule.email) emailsToUnblock.add(normalizeStr(targetRule.email));
+                    if (targetRule.deviceId) devicesToUnblock.add(normalizeStr(targetRule.deviceId));
+                    if (targetRule.sessionToken) tokensToUnblock.add(normalizeStr(targetRule.sessionToken));
+                    if (targetRule.ip) ipsToUnblock.add(normalizeStr(targetRule.ip));
+                    bl.rules = bl.rules.filter(r => r.id !== criteria.ruleId);
                 }
-                if (targetRule.email) {
-                    bl.blockedEmails = bl.blockedEmails.filter(x => normalizeStr(x) !== normalizeStr(targetRule.email));
-                }
-                if (targetRule.deviceId) {
-                    bl.blockedDevices = bl.blockedDevices.filter(x => normalizeStr(x) !== normalizeStr(targetRule.deviceId));
-                }
-                if (targetRule.sessionToken) {
-                    bl.blockedTokens = bl.blockedTokens.filter(x => normalizeStr(x) !== normalizeStr(targetRule.sessionToken));
-                }
-                if (targetRule.ip) {
-                    bl.blockedIPs = bl.blockedIPs.filter(x => normalizeStr(x) !== normalizeStr(targetRule.ip));
-                }
-                bl.rules = bl.rules.filter(r => r.id !== criteria.ruleId);
             }
-        }
 
-        if (criteria.firstName) {
+            if (!criteria.singleOnly) {
+                Object.values(map).forEach(s => {
+                    const sName = normalizeFirstName(s.firstName);
+                    const sPrimary = extractPrimaryFirstName(s.firstName);
+                    const sEmail = normalizeStr(s.email);
+                    const sDev = normalizeStr(s.deviceId);
+                    const sTok = normalizeStr(s.sessionToken);
+
+                    const matchesAccount =
+                        (sName && namesToUnblock.has(sName)) ||
+                        (sPrimary && namesToUnblock.has(sPrimary)) ||
+                        (sEmail && emailsToUnblock.has(sEmail)) ||
+                        (sDev && devicesToUnblock.has(sDev)) ||
+                        (sTok && tokensToUnblock.has(sTok));
+
+                    if (matchesAccount) {
+                        if (sName) namesToUnblock.add(sName);
+                        if (sPrimary) namesToUnblock.add(sPrimary);
+                        if (sEmail) emailsToUnblock.add(sEmail);
+                        if (sDev) devicesToUnblock.add(sDev);
+                        if (sTok) tokensToUnblock.add(sTok);
+                        if (s.ip) ipsToUnblock.add(normalizeStr(s.ip));
+                    }
+                });
+
+                bl.rules.forEach(r => {
+                    const rName = normalizeFirstName(r.firstName);
+                    const rEmail = normalizeStr(r.email);
+                    const rDev = normalizeStr(r.deviceId);
+                    const rTok = normalizeStr(r.sessionToken);
+
+                    const matchesRule =
+                        (rName && namesToUnblock.has(rName)) ||
+                        (rEmail && emailsToUnblock.has(rEmail)) ||
+                        (rDev && devicesToUnblock.has(rDev)) ||
+                        (rTok && tokensToUnblock.has(rTok));
+
+                    if (matchesRule) {
+                        if (rName) namesToUnblock.add(rName);
+                        if (rEmail) emailsToUnblock.add(rEmail);
+                        if (rDev) devicesToUnblock.add(rDev);
+                        if (rTok) tokensToUnblock.add(rTok);
+                        if (r.ip) ipsToUnblock.add(normalizeStr(r.ip));
+                    }
+                });
+            }
+
             bl.blockedNames = bl.blockedNames.filter(
-                x =>
-                    normalizeFirstName(x) !== normalizeFirstName(criteria.firstName) &&
-                    extractPrimaryFirstName(x) !== extractPrimaryFirstName(criteria.firstName)
+                x => !namesToUnblock.has(normalizeFirstName(x)) && !namesToUnblock.has(extractPrimaryFirstName(x))
             );
-        }
-        if (criteria.email) {
-            bl.blockedEmails = bl.blockedEmails.filter(x => normalizeStr(x) !== normalizeStr(criteria.email));
-        }
-        if (criteria.deviceId) {
-            bl.blockedDevices = bl.blockedDevices.filter(x => normalizeStr(x) !== normalizeStr(criteria.deviceId));
-        }
-        if (criteria.sessionToken) {
-            bl.blockedTokens = bl.blockedTokens.filter(x => normalizeStr(x) !== normalizeStr(criteria.sessionToken));
-        }
-        if (criteria.ip) {
-            bl.blockedIPs = bl.blockedIPs.filter(x => normalizeStr(x) !== normalizeStr(criteria.ip));
-        }
+            bl.blockedEmails = bl.blockedEmails.filter(x => !emailsToUnblock.has(normalizeStr(x)));
+            bl.blockedDevices = bl.blockedDevices.filter(x => !devicesToUnblock.has(normalizeStr(x)));
+            bl.blockedTokens = bl.blockedTokens.filter(x => !tokensToUnblock.has(normalizeStr(x)));
+            bl.blockedIPs = bl.blockedIPs.filter(x => !ipsToUnblock.has(normalizeStr(x)));
 
-        if (criteria.firstName || criteria.email || criteria.deviceId || criteria.sessionToken) {
             bl.rules = bl.rules.filter(r => {
-                if (criteria.firstName && r.firstName && normalizeFirstName(r.firstName) === normalizeFirstName(criteria.firstName)) return false;
-                if (criteria.email && r.email && normalizeStr(r.email) === normalizeStr(criteria.email)) return false;
-                if (criteria.deviceId && r.deviceId && normalizeStr(r.deviceId) === normalizeStr(criteria.deviceId)) return false;
-                if (criteria.sessionToken && r.sessionToken && normalizeStr(r.sessionToken) === normalizeStr(criteria.sessionToken)) return false;
+                if (r.firstName && namesToUnblock.has(normalizeFirstName(r.firstName))) return false;
+                if (r.email && emailsToUnblock.has(normalizeStr(r.email))) return false;
+                if (r.deviceId && devicesToUnblock.has(normalizeStr(r.deviceId))) return false;
+                if (r.sessionToken && tokensToUnblock.has(normalizeStr(r.sessionToken))) return false;
                 return true;
             });
         }
@@ -1342,7 +1409,8 @@
             localStorage.removeItem(STORAGE_KEYS.LOCAL_BAN_FLAG);
         } catch (e) {}
 
-        const map = getSessionsMap();
+        saveBlocklist(bl, true);
+
         Object.values(map).forEach(s => {
             const stillBlocked = checkIsBlocked({
                 firstName: s.firstName,
@@ -1356,14 +1424,15 @@
             }
         });
         saveSessionsMap(map);
-        saveBlocklist(bl, true);
 
         appendAuditLog({
             action: "ACCESS_RESTORED",
-            firstName: criteria.firstName || "-",
+            firstName: criteria.unblockAll ? "TODAS LAS CUENTAS" : (criteria.firstName || "-"),
             email: criteria.email || "-",
             deviceId: criteria.deviceId || "-",
-            reason: "Desbloqueado por el administrador"
+            reason: criteria.unblockAll
+                ? "Todas las cuentas bloqueadas fueron desbloqueadas"
+                : "Cuenta desbloqueada por el administrador"
         }, false);
 
         return bl;

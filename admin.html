@@ -166,6 +166,28 @@
             color: #fff;
         }
 
+        .btn-success {
+            background: var(--accent-green);
+            color: #052e16;
+            font-weight: 700;
+        }
+
+        .btn-success:hover {
+            background: #16a34a;
+            color: #fff;
+        }
+
+        .btn-outline-success {
+            background: var(--accent-green-bg);
+            color: #4ade80;
+            border-color: rgba(34, 197, 94, 0.45);
+        }
+
+        .btn-outline-success:hover {
+            background: var(--accent-green);
+            color: #052e16;
+        }
+
         .btn-secondary {
             background: #334155;
             color: #e2e8f0;
@@ -559,7 +581,7 @@
                                 <th>Dispositivo / IP / Token</th>
                                 <th>Hora de Ingreso y Actividad</th>
                                 <th>Estado de Sesión</th>
-                                <th>Bloquear / Revocar Acceso Inmediato</th>
+                                <th>Bloquear / Desbloquear Acceso</th>
                             </tr>
                         </thead>
                         <tbody id="sessions-table-body">
@@ -573,16 +595,16 @@
 
             <!-- SECCIÓN DE BLOQUEO MANUAL Y LISTA DE BLOQUEOS ACTIVOS -->
             <div class="grid-2col">
-                <!-- FORMULARIO DE BLOQUEO DIRECTO -->
+                <!-- FORMULARIO DE BLOQUEO / DESBLOQUEO DIRECTO -->
                 <section class="panel-section">
                     <div class="panel-header">
-                        <h3>&#128683; Bloquear / Revocar Acceso Manualmente</h3>
+                        <h3>&#128683; / &#128275; Bloquear o Desbloquear Cuenta Manualmente</h3>
                     </div>
                     <div class="panel-body">
                         <p style="font-size: 12.5px; color: var(--text-secondary); margin-bottom: 16px;">
-                            Puedes bloquear preventivamente o revocar en caliente cualquier combinación de
-                            <strong>Primer Nombre</strong>, <strong>Correo electrónico</strong> o
-                            <strong>Dispositivo / Token de sesión / IP</strong>.
+                            Ingresa cualquier combinación de <strong>Primer Nombre</strong>, <strong>Correo electrónico</strong> o
+                            <strong>Dispositivo / Token / IP</strong> para <strong>Bloquear</strong> en tiempo real o
+                            <strong>Desbloquear</strong> una cuenta previamente bloqueada.
                         </p>
                         <form id="manual-block-form">
                             <div class="input-group">
@@ -591,7 +613,7 @@
                                     id="block-name-input"
                                     type="text"
                                     class="input-control"
-                                    placeholder="Ej. Carlos"
+                                    placeholder="Ej. Carlos o KAORY"
                                 />
                             </div>
                             <div class="input-group">
@@ -613,7 +635,7 @@
                                 />
                             </div>
                             <div class="input-group">
-                                <label for="block-reason-input">Motivo del bloqueo</label>
+                                <label for="block-reason-input">Motivo (para bloqueo)</label>
                                 <input
                                     id="block-reason-input"
                                     type="text"
@@ -621,9 +643,14 @@
                                     placeholder="Ej. Compartió contraseña / Uso no autorizado"
                                 />
                             </div>
-                            <button type="submit" class="btn btn-danger" style="width: 100%; padding: 12px;">
-                                &#128683; EJECUTAR BLOQUEO Y CERRAR SESIÓN
-                            </button>
+                            <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+                                <button type="submit" class="btn btn-danger" style="flex: 1; padding: 12px; justify-content: center;">
+                                    &#128683; BLOQUEAR CUENTA
+                                </button>
+                                <button type="button" id="btn-manual-unblock" class="btn btn-success" style="flex: 1; padding: 12px; justify-content: center;">
+                                    &#128275; DESBLOQUEAR CUENTA
+                                </button>
+                            </div>
                         </form>
                     </div>
                 </section>
@@ -631,7 +658,10 @@
                 <!-- LISTA DE BLOQUEOS ACTIVOS (CON OPCIÓN DE DESBLOQUEAR) -->
                 <section class="panel-section">
                     <div class="panel-header">
-                        <h3>&#128274; Lista Activa de Bloqueos (Blocklist)</h3>
+                        <h3>&#128274; Cuentas y Criterios Bloqueados (Blocklist)</h3>
+                        <button id="btn-unblock-all" class="btn btn-outline-success btn-sm" title="Desbloquear todas las cuentas bloqueadas">
+                            &#128275; Desbloquear Todas
+                        </button>
                     </div>
                     <div class="table-responsive">
                         <table>
@@ -840,14 +870,18 @@
                         const isBlocked = s.computedStatus === "Bloqueada";
 
                         const actionsHtml = isBlocked
-                            ? `<button class="btn btn-secondary btn-sm"
-                                    data-action="unblock-session"
-                                    data-name="${escapeHtml(s.firstName)}"
-                                    data-email="${escapeHtml(s.email)}"
-                                    data-device="${escapeHtml(s.deviceId)}"
-                                    data-token="${escapeHtml(s.sessionToken)}">
-                                    &#128275; Restaurar Acceso
-                               </button>`
+                            ? `<div class="action-btns">
+                                    <button class="btn btn-success btn-sm"
+                                        title="Desbloquea inmediatamente Nombre, Correo y Dispositivo de esta cuenta"
+                                        data-action="unblock-session"
+                                        data-name="${escapeHtml(s.firstName)}"
+                                        data-email="${escapeHtml(s.email)}"
+                                        data-device="${escapeHtml(s.deviceId)}"
+                                        data-token="${escapeHtml(s.sessionToken)}"
+                                        data-ip="${escapeHtml(s.ip)}">
+                                        &#128275; Desbloquear
+                                    </button>
+                               </div>`
                             : `<div class="action-btns">
                                     <button class="btn btn-danger btn-sm"
                                         title="Bloquea Nombre, Correo, Dispositivo y cierra su sesión de inmediato"
@@ -878,6 +912,16 @@
                                         data-device="${escapeHtml(s.deviceId)}"
                                         data-token="${escapeHtml(s.sessionToken)}">
                                         Bloquear Dispositivo
+                                    </button>
+                                    <button class="btn btn-outline-success btn-sm"
+                                        title="Asegura o restaura el acceso para esta cuenta"
+                                        data-action="unblock-session"
+                                        data-name="${escapeHtml(s.firstName)}"
+                                        data-email="${escapeHtml(s.email)}"
+                                        data-device="${escapeHtml(s.deviceId)}"
+                                        data-token="${escapeHtml(s.sessionToken)}"
+                                        data-ip="${escapeHtml(s.ip)}">
+                                        &#128275; Desbloquear
                                     </button>
                                </div>`;
 
@@ -911,24 +955,55 @@
 
             function renderBlocklistTable(bl) {
                 const tbody = document.getElementById("blocklist-table-body");
-                const items = [];
+                const rowsHtml = [];
 
+                if (Array.isArray(bl.rules) && bl.rules.length > 0) {
+                    bl.rules.forEach(rule => {
+                        const badges = [];
+                        if (rule.firstName) badges.push(`<span class="mono-tag">Nombre: ${escapeHtml(rule.firstName)}</span>`);
+                        if (rule.email) badges.push(`<span class="mono-tag">Correo: ${escapeHtml(rule.email)}</span>`);
+                        if (rule.deviceId) badges.push(`<span class="mono-tag">Dispositivo: ${escapeHtml(rule.deviceId)}</span>`);
+                        if (rule.sessionToken) badges.push(`<span class="mono-tag">Token: ${escapeHtml(rule.sessionToken)}</span>`);
+                        if (rule.ip) badges.push(`<span class="mono-tag">IP: ${escapeHtml(rule.ip)}</span>`);
+
+                        rowsHtml.push(`
+                            <tr>
+                                <td>
+                                    <div style="font-size:11px;text-transform:uppercase;color:#f87171;font-weight:700;margin-bottom:4px;">
+                                        Cuenta Bloqueada
+                                    </div>
+                                    <div>${badges.join(" ")}</div>
+                                </td>
+                                <td style="font-size:12px;color:#94a3b8;">
+                                    <div>${escapeHtml(rule.reason || "Bloqueo administrativo")}</div>
+                                    <div style="font-size:11px;color:#64748b;">${escapeHtml(formatDateTime(rule.blockedAt))}</div>
+                                </td>
+                                <td>
+                                    <button class="btn btn-success btn-sm"
+                                        data-action="unblock-rule"
+                                        data-rule-id="${escapeHtml(rule.ruleId || "")}"
+                                        data-name="${escapeHtml(rule.firstName || "")}"
+                                        data-email="${escapeHtml(rule.email || "")}"
+                                        data-device="${escapeHtml(rule.deviceId || "")}"
+                                        data-token="${escapeHtml(rule.sessionToken || "")}"
+                                        data-ip="${escapeHtml(rule.ip || "")}">
+                                        &#128275; Desbloquear
+                                    </button>
+                                </td>
+                            </tr>
+                        `);
+                    });
+                }
+
+                const items = [];
                 bl.blockedNames.forEach(val => items.push({ type: "Primer Nombre", key: "firstName", value: val }));
                 bl.blockedEmails.forEach(val => items.push({ type: "Correo Electrónico", key: "email", value: val }));
                 bl.blockedDevices.forEach(val => items.push({ type: "Dispositivo", key: "deviceId", value: val }));
                 bl.blockedTokens.forEach(val => items.push({ type: "Token de Sesión", key: "sessionToken", value: val }));
                 bl.blockedIPs.forEach(val => items.push({ type: "Dirección IP", key: "ip", value: val }));
 
-                if (items.length === 0) {
-                    tbody.innerHTML = `
-                        <tr>
-                            <td colspan="3" class="empty-state">No hay usuarios, correos ni dispositivos bloqueados actualmente.</td>
-                        </tr>`;
-                    return;
-                }
-
-                tbody.innerHTML = items
-                    .map(item => `
+                items.forEach(item => {
+                    rowsHtml.push(`
                         <tr>
                             <td>
                                 <span style="font-size:11px;text-transform:uppercase;color:#f87171;font-weight:700;">
@@ -940,7 +1015,7 @@
                                 Bloqueo activo permanente
                             </td>
                             <td>
-                                <button class="btn btn-secondary btn-sm"
+                                <button class="btn btn-success btn-sm"
                                     data-action="unblock-single"
                                     data-key="${escapeHtml(item.key)}"
                                     data-val="${escapeHtml(item.value)}">
@@ -948,8 +1023,18 @@
                                 </button>
                             </td>
                         </tr>
-                    `)
-                    .join("");
+                    `);
+                });
+
+                if (rowsHtml.length === 0) {
+                    tbody.innerHTML = `
+                        <tr>
+                            <td colspan="3" class="empty-state">No hay cuentas, correos ni dispositivos bloqueados actualmente.</td>
+                        </tr>`;
+                    return;
+                }
+
+                tbody.innerHTML = rowsHtml.join("");
             }
 
             function renderAuditTable(logs) {
@@ -968,7 +1053,7 @@
                     FAILED_PASSWORD: "Intento Fallido de Contraseña",
                     BLOCKED_LOGIN_ATTEMPT: "Intento de Acceso Bloqueado",
                     ACCESS_REVOKED: "Acceso Revocado por Administrador",
-                    ACCESS_RESTORED: "Acceso Restaurado por Administrador"
+                    ACCESS_RESTORED: "Acceso Desbloqueado por Administrador"
                 };
 
                 tbody.innerHTML = logs
@@ -998,6 +1083,7 @@
                 const deviceId = btn.getAttribute("data-device");
                 const sessionToken = btn.getAttribute("data-token");
                 const ip = btn.getAttribute("data-ip");
+                const ruleId = btn.getAttribute("data-rule-id");
 
                 if (action === "block-all") {
                     window.EGELSecurity.blockAccess({
@@ -1036,14 +1122,16 @@
                     });
                     showToast(`Dispositivo "${deviceId}" bloqueado permanentemente.`);
                     renderAll();
-                } else if (action === "unblock-session") {
+                } else if (action === "unblock-session" || action === "unblock-rule") {
                     window.EGELSecurity.unblockAccess({
+                        ruleId,
                         firstName,
                         email,
                         deviceId,
-                        sessionToken
+                        sessionToken,
+                        ip
                     });
-                    showToast(`Acceso restaurado para ${firstName || email}`);
+                    showToast(`Cuenta desbloqueada: ${firstName || email || deviceId}`);
                     renderAll();
                 } else if (action === "unblock-single") {
                     const key = btn.getAttribute("data-key");
@@ -1054,7 +1142,7 @@
                 }
             });
 
-            /* FORMULARIO DE BLOQUEO MANUAL */
+            /* FORMULARIO DE BLOQUEO Y DESBLOQUEO MANUAL */
             document.getElementById("manual-block-form").addEventListener("submit", function (e) {
                 e.preventDefault();
                 const firstName = document.getElementById("block-name-input").value.trim();
@@ -1083,6 +1171,41 @@
                 window.EGELSecurity.blockAccess(opts);
                 e.target.reset();
                 showToast("Regla de bloqueo aplicada y transmitida en tiempo real.");
+                renderAll();
+            });
+
+            document.getElementById("btn-manual-unblock").addEventListener("click", function () {
+                const firstName = document.getElementById("block-name-input").value.trim();
+                const email = document.getElementById("block-email-input").value.trim();
+                const devOrToken = document.getElementById("block-device-input").value.trim();
+
+                if (!firstName && !email && !devOrToken) {
+                    showToast("Ingresa el Nombre, Correo o Dispositivo de la cuenta que deseas desbloquear.");
+                    return;
+                }
+
+                const opts = {};
+                if (firstName) opts.firstName = firstName;
+                if (email) opts.email = email;
+                if (devOrToken) {
+                    if (devOrToken.toUpperCase().startsWith("TOK-")) {
+                        opts.sessionToken = devOrToken;
+                    } else if (/^\d{1,3}(\.\d{1,3}){3}$/.test(devOrToken)) {
+                        opts.ip = devOrToken;
+                    } else {
+                        opts.deviceId = devOrToken;
+                    }
+                }
+
+                window.EGELSecurity.unblockAccess(opts);
+                document.getElementById("manual-block-form").reset();
+                showToast(`Cuenta desbloqueada y acceso restaurado para ${firstName || email || devOrToken}.`);
+                renderAll();
+            });
+
+            document.getElementById("btn-unblock-all").addEventListener("click", function () {
+                window.EGELSecurity.unblockAccess({ unblockAll: true });
+                showToast("Todas las cuentas han sido desbloqueadas.");
                 renderAll();
             });
 
