@@ -470,7 +470,7 @@
         }
     </style>
     <script>window.__EGEL_IS_ADMIN_PANEL__ = true;</script>
-    <script src="egel-security.js"></script>
+    <script src="egel-security.js?v=3"></script>
 </head>
 <body>
 
@@ -1092,7 +1092,6 @@
                         email,
                         deviceId,
                         sessionToken,
-                        ip,
                         reason: "Revocación total desde Panel Administrativo (Nombre, Correo y Dispositivo)"
                     });
                     showToast(`Acceso revocado inmediatamente para ${firstName} (${email})`);

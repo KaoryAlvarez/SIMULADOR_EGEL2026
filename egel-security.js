@@ -22,12 +22,12 @@
         LOCAL_BAN_FLAG: "__egel2026_sec_device_banned_v1",
         CURRENT_SESSION: "__egel2026_sec_current_session_v1",
         ADMIN_HASH: "__egel2026_sec_admin_hash_v1",
-        RELAY_TOPIC: "__egel2026_sec_relay_topic_v1",
-        EMERGENCY_UNBLOCK_DONE: "__egel2026_unblock_kaory_22011435_v2"
+        RELAY_TOPIC: "__egel2026_sec_relay_topic_v3",
+        EMERGENCY_UNBLOCK_DONE: "__egel2026_unblock_kaory_22011435_v3"
     };
 
     const CHANNEL_NAME = "egel2026_security_realtime_bus";
-    const DEFAULT_RELAY_TOPIC = "egel2026_sec_sync_kgca_v2";
+    const DEFAULT_RELAY_TOPIC = "egel2026_sec_sync_kgca_v3";
     const HEARTBEAT_INTERVAL_MS = 4000;
     const INACTIVE_THRESHOLD_MS = 90 * 1000;
     const OFFLINE_THRESHOLD_MS = 18 * 1000;
@@ -231,7 +231,7 @@
     function getEmptyBlocklist() {
         return {
             version: "1.0.0",
-            updatedAt: new Date().toISOString(),
+            updatedAt: "1970-01-01T00:00:00.000Z",
             blockedNames: [],
             blockedEmails: [],
             blockedDevices: [],
@@ -248,7 +248,7 @@
             const parsed = JSON.parse(raw);
             return {
                 version: parsed.version || "1.0.0",
-                updatedAt: parsed.updatedAt || new Date().toISOString(),
+                updatedAt: parsed.updatedAt || "1970-01-01T00:00:00.000Z",
                 blockedNames: Array.isArray(parsed.blockedNames) ? parsed.blockedNames : [],
                 blockedEmails: Array.isArray(parsed.blockedEmails) ? parsed.blockedEmails : [],
                 blockedDevices: Array.isArray(parsed.blockedDevices) ? parsed.blockedDevices : [],
@@ -262,7 +262,9 @@
     }
 
     function saveBlocklist(bl, shouldBroadcast = true) {
-        bl.updatedAt = new Date().toISOString();
+        if (shouldBroadcast || !bl.updatedAt) {
+            bl.updatedAt = new Date().toISOString();
+        }
         try {
             localStorage.setItem(STORAGE_KEYS.BLOCKLIST, JSON.stringify(bl));
         } catch (e) {}
@@ -287,12 +289,16 @@
     function runCreatorAccountRescue() {
         try {
             localStorage.removeItem(STORAGE_KEYS.LOCAL_BAN_FLAG);
-            const alreadyRescued = localStorage.getItem(STORAGE_KEYS.EMERGENCY_UNBLOCK_DONE);
-            if (!alreadyRescued) {
-                const myDev = getOrCreateDeviceId();
-                const hwFp = computeHardwareFingerprint();
-                const bl = getBlocklist();
+            const myDev = getOrCreateDeviceId();
+            const hwFp = computeHardwareFingerprint();
+            const bl = getBlocklist();
 
+            // Limpiar siempre la IP 187.251.205.109 que quedó bloqueada por error en la prueba anterior
+            const hadStaleCreatorBlock =
+                bl.blockedIPs.some(ip => normalizeStr(ip) === "187.251.205.109") ||
+                !localStorage.getItem(STORAGE_KEYS.EMERGENCY_UNBLOCK_DONE);
+
+            if (hadStaleCreatorBlock) {
                 bl.blockedNames = bl.blockedNames.filter(n => normalizeStr(n) !== "kaory");
                 bl.blockedEmails = bl.blockedEmails.filter(e => normalizeStr(e) !== "22011435@itsoeh.edu.mx");
                 bl.blockedDevices = bl.blockedDevices.filter(
@@ -302,9 +308,11 @@
                         normalizeStr(d) !== "dev-e3ca-e056"
                 );
                 bl.blockedTokens = [];
+                bl.blockedIPs = [];
                 bl.rules = bl.rules.filter(r => {
                     if (r.firstName && normalizeStr(r.firstName) === "kaory") return false;
                     if (r.email && normalizeStr(r.email) === "22011435@itsoeh.edu.mx") return false;
+                    if (r.ip && normalizeStr(r.ip) === "187.251.205.109") return false;
                     if (
                         r.deviceId &&
                         (normalizeStr(r.deviceId) === normalizeStr(myDev) ||
@@ -322,13 +330,14 @@
                         normalizeStr(s.firstName) === "kaory" ||
                         normalizeStr(s.email) === "22011435@itsoeh.edu.mx" ||
                         normalizeStr(s.deviceId) === normalizeStr(myDev) ||
-                        normalizeStr(s.deviceId) === "dev-e3ca-e056"
+                        normalizeStr(s.deviceId) === "dev-e3ca-e056" ||
+                        normalizeStr(s.ip) === "187.251.205.109"
                     ) {
                         s.status = "Inactiva";
                     }
                 });
                 saveSessionsMap(map);
-                saveBlocklist(bl, true);
+                saveBlocklist(bl, false);
                 localStorage.setItem(STORAGE_KEYS.EMERGENCY_UNBLOCK_DONE, "1");
             }
         } catch (e) {}
@@ -797,6 +806,17 @@
                     try {
                         localStorage.removeItem(STORAGE_KEYS.LOCAL_BAN_FLAG);
                     } catch (e) {}
+                    window.location.reload();
+                }
+            }
+        } else if (data.type === "UNBLOCK_COMMAND" && data.blocklist) {
+            saveBlocklist(data.blocklist, false);
+            try {
+                localStorage.removeItem(STORAGE_KEYS.LOCAL_BAN_FLAG);
+            } catch (e) {}
+            if (!isAdminPanelContext()) {
+                const checkRes = checkAndEnforceCurrentSessionBlock();
+                if (!checkRes.blocked && isRevokedScreenShown) {
                     window.location.reload();
                 }
             }
@@ -1401,8 +1421,14 @@
                 if (r.email && emailsToUnblock.has(normalizeStr(r.email))) return false;
                 if (r.deviceId && devicesToUnblock.has(normalizeStr(r.deviceId))) return false;
                 if (r.sessionToken && tokensToUnblock.has(normalizeStr(r.sessionToken))) return false;
+                if (r.ip && ipsToUnblock.has(normalizeStr(r.ip))) return false;
                 return true;
             });
+
+            // Si ya no queda ninguna regla activa, limpiar también cualquier IP residual
+            if (bl.rules.length === 0 && !criteria.singleOnly) {
+                bl.blockedIPs = [];
+            }
         }
 
         try {
@@ -1410,6 +1436,14 @@
         } catch (e) {}
 
         saveBlocklist(bl, true);
+
+        const unblockPayload = {
+            type: "UNBLOCK_COMMAND",
+            blocklist: bl,
+            timestamp: Date.now()
+        };
+        broadcastMessage(unblockPayload);
+        publishToRemoteRelay(unblockPayload);
 
         Object.values(map).forEach(s => {
             const stillBlocked = checkIsBlocked({
@@ -1463,8 +1497,12 @@
         publishToRemoteRelay(ping);
     }
 
-    // Ejecutar rescate inmediato de la cuenta de la creadora (KAORY / 22011435@itsoeh.edu.mx)
+    // Ejecutar rescate inmediato de la cuenta de la creadora (KAORY / 22011435@itsoeh.edu.mx / 187.251.205.109)
     runCreatorAccountRescue();
+
+    // Conectar SIEMPRE al canal en tiempo real desde la pantalla inicial (Paso 1, Pantalla de bloqueo o Simulador)
+    // para que cualquier "Desbloquear" desde admin.html surta efecto de inmediato incluso entre distintos dominios.
+    subscribeToRemoteRelay();
 
     const currentScript = document.currentScript;
     if (currentScript && currentScript.getAttribute("data-context") === "unlocked") {
